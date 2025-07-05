@@ -41,7 +41,7 @@ jobs:
         shell: pwsh
 
       - name: gemini-cli install
-        run: npm install -g @google-gemini/gemini-cli
+        run: npx https://github.com/google-gemini/gemini-cli
         shell: pwsh
 
       - name: Generate Documentation
