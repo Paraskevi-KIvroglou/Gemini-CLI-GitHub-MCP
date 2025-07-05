@@ -1,0 +1,54 @@
+name: Auto Update Docs with Gemini CLI + MCP
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+      
+jobs:
+  update-docs:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Gemini CLI
+        run: npm install -g @google-gemini/gemini-cli
+        shell: pwsh
+
+      - name: Configure MCP Server
+        shell: pwsh
+        run: |
+          New-Item -Path $env:USERPROFILE\.gemini -ItemType Directory -Force
+          $json = @'
+          {
+            "mcpServers": {
+              "github": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-github"],
+                "env": {
+                  "GITHUB_PERSONAL_ACCESS_TOKEN": "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+                }
+              }
+            }
+          }
+          '@
+          $json | Set-Content -Path $env:USERPROFILE\.gemini\settings.json
+
+      - name: Generate Documentation
+        run: gemini docs --input=src/ --output=docs/ --use-mcp=github
+        shell: pwsh
+
+      - name: Commit and Push Documentation
+        shell: pwsh
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'actions@github.com'
+          git add docs/
+          git commit -m "Auto-update docs with Gemini CLI + MCP" || echo "No changes to commit"
+          git push
