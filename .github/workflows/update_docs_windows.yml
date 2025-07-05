@@ -37,7 +37,7 @@ jobs:
           $json | Set-Content -Path $env:USERPROFILE\.gemini\settings.json
 
       - name: Generate Documentation
-        run: gemini docs --input=src/ --output=docs/ --use-mcp=github
+        run: npx gemini docs --input=src/ --output=docs/ --use-mcp=github
         shell: pwsh
 
       - name: Commit and Push Documentation
