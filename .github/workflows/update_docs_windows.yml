@@ -35,6 +35,10 @@ jobs:
           }
           '@
           $json | Set-Content -Path $env:USERPROFILE\.gemini\settings.json
+    
+      - name: Clean npm cache
+        run: npm cache clean --force
+        shell: pwsh
 
       - name: Generate Documentation
         run: npx gemini docs --input=src/ --output=docs/ --use-mcp=github

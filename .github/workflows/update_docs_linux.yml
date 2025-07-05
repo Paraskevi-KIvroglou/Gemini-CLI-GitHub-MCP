@@ -1,9 +1,12 @@
 name: Auto Update Docs with Gemini CLI + MCP
 
+# Trigger this workflow when code is pushed to the main branch Uncomment for Linux auto-update
+#on:
+#  push:
+#    branches:
+#      - main
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   update-docs:
@@ -32,7 +35,7 @@ jobs:
           }' > ~/.gemini/settings.json
 
       - name: Generate Documentation
-        run: gemini docs --input=src/ --output=docs/ --use-mcp=github
+        run: npxgemini docs --input=src/ --output=docs/ --use-mcp=github
 
       - name: Commit and Push Documentation
         run: |
