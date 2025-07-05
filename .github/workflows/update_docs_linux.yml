@@ -35,7 +35,7 @@ jobs:
           }' > ~/.gemini/settings.json
 
       - name: Generate Documentation
-        run: npxgemini docs --input=src/ --output=docs/ --use-mcp=github
+        run: npx gemini docs --input=src/ --output=docs/ --use-mcp=github
 
       - name: Commit and Push Documentation
         run: |
