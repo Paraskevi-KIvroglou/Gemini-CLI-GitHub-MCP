@@ -17,10 +17,6 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Gemini CLI
-        run: npm install -g @google-gemini/gemini-cli
-        shell: pwsh
-
       - name: Configure MCP Server
         shell: pwsh
         run: |
