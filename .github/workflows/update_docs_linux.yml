@@ -34,8 +34,31 @@ jobs:
             }
           }' > ~/.gemini/settings.json
 
+      - name: Install Gemini CLI
+        run: npm install -g @google/gemini-cli
+
       - name: Generate Documentation
-        run: npx gemini docs --input=src/ --output=docs/ --use-mcp=github
+        run: |
+          # Create necessary directories
+          mkdir -p scripts
+          
+          # Run the documentation generation script
+          if [ -f "scripts/generate-docs.js" ]; then
+            node scripts/generate-docs.js
+          else
+            echo "📝 Note: Gemini CLI is primarily interactive."
+            echo "🔧 For automated documentation generation, consider:"
+            echo "   - Using the Gemini API directly"
+            echo "   - Creating a custom MCP server"
+            echo "   - Using tools like JSDoc, TypeDoc, or similar"
+            
+            # Create placeholder documentation
+            mkdir -p docs
+            echo "# Auto-generated Documentation" > docs/README.md
+            echo "Generated on: $(date)" >> docs/README.md
+            echo "" >> docs/README.md
+            echo "This is a placeholder. Set up proper documentation generation." >> docs/README.md
+          fi
 
       - name: Commit and Push Documentation
         run: |

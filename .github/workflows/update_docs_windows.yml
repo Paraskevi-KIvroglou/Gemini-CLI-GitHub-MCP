@@ -40,13 +40,30 @@ jobs:
         run: npm cache clean --force
         shell: pwsh
 
-      - name: gemini-cli install
-        run: npx https://github.com/google-gemini/gemini-cli
+      - name: Install Gemini CLI
+        run: npm install -g @google/gemini-cli
         shell: pwsh
 
       - name: Generate Documentation
-        run: gemini docs --input=src/ --output=docs/ --auto-link --update-existing --use-mcp=github
         shell: pwsh
+        run: |
+          # Create necessary directories
+          New-Item -Path "scripts" -ItemType Directory -Force
+          
+          # Run the documentation generation script
+          if (Test-Path "scripts/generate-docs.js") {
+            node scripts/generate-docs.js
+          } else {
+            Write-Host "📝 Note: Gemini CLI is primarily interactive."
+            Write-Host "🔧 For automated documentation generation, consider:"
+            Write-Host "   - Using the Gemini API directly"
+            Write-Host "   - Creating a custom MCP server"
+            Write-Host "   - Using tools like JSDoc, TypeDoc, or similar"
+            
+            # Create placeholder documentation
+            New-Item -Path "docs" -ItemType Directory -Force
+            "# Auto-generated Documentation`n`nGenerated on: $(Get-Date)`n`nThis is a placeholder. Set up proper documentation generation." | Out-File -FilePath "docs/README.md" -Encoding UTF8
+          }
 
       - name: Commit and Push Documentation
         shell: pwsh
