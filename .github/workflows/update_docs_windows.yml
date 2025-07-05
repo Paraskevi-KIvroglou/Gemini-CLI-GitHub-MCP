@@ -40,8 +40,12 @@ jobs:
         run: npm cache clean --force
         shell: pwsh
 
+      - name: gemini-cli install
+        run: npm install -g @google-gemini/gemini-cli
+        shell: pwsh
+
       - name: Generate Documentation
-        run: npx gemini docs --input=src/ --output=docs/ --use-mcp=github
+        run: gemini docs --input=src/ --output=docs/ --auto-link --update-existing --use-mcp=github
         shell: pwsh
 
       - name: Commit and Push Documentation
