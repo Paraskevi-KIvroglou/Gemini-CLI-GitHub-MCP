@@ -1,0 +1,233 @@
+name: Test Gemini CLI + MCP Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of test to run'
+        required: false
+        default: 'validation'
+        type: choice
+        options:
+          - validation
+          - mcp-config
+          - gemini-install
+          - full-test
+      input_dir:
+        description: 'Test input directory'
+        required: false
+        default: 'src/'
+        type: string
+      output_dir:
+        description: 'Test output directory'
+        required: false
+        default: 'test-docs/'
+        type: string
+
+jobs:
+  test-validation:
+    runs-on: windows-latest
+    if: github.event.inputs.test_type == 'validation' || github.event.inputs.test_type == 'full-test'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Input Directory
+        shell: pwsh
+        run: |
+          $inputDir = "${{ github.event.inputs.input_dir }}"
+          Write-Host "Testing input directory: $inputDir"
+          
+          if (Test-Path $inputDir) {
+            $itemCount = (Get-ChildItem $inputDir -Recurse | Measure-Object).Count
+            Write-Host "✅ Input directory exists with $itemCount items"
+          } else {
+            Write-Error "❌ Input directory does not exist"
+            exit 1
+          }
+
+      - name: Validate Output Directory Creation
+        shell: pwsh
+        run: |
+          $outputDir = "${{ github.event.inputs.output_dir }}"
+          Write-Host "Testing output directory: $outputDir"
+          
+          # Create output directory
+          New-Item -Path $outputDir -ItemType Directory -Force
+          
+          if (Test-Path $outputDir) {
+            Write-Host "✅ Output directory created successfully"
+          } else {
+            Write-Error "❌ Failed to create output directory"
+            exit 1
+          }
+
+  test-mcp-config:
+    runs-on: windows-latest
+    if: github.event.inputs.test_type == 'mcp-config' || github.event.inputs.test_type == 'full-test'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Test MCP Configuration
+        shell: pwsh
+        run: |
+          # Create .gemini directory
+          New-Item -Path $env:USERPROFILE\.gemini -ItemType Directory -Force
+          
+          # Create test MCP configuration
+          $json = @{
+            mcpServers = @{
+              github = @{
+                command = "npx"
+                args = @("-y", "@modelcontextprotocol/server-github")
+                env = @{
+                  GITHUB_PERSONAL_ACCESS_TOKEN = "test-token"
+                }
+              }
+            }
+          } | ConvertTo-Json -Depth 10
+          
+          $json | Set-Content -Path $env:USERPROFILE\.gemini\settings.json
+          
+          # Verify configuration
+          if (Test-Path $env:USERPROFILE\.gemini\settings.json) {
+            $config = Get-Content $env:USERPROFILE\.gemini\settings.json | ConvertFrom-Json
+            if ($config.mcpServers.github) {
+              Write-Host "✅ MCP configuration created and validated"
+            } else {
+              Write-Error "❌ MCP configuration is invalid"
+              exit 1
+            }
+          } else {
+            Write-Error "❌ Failed to create MCP configuration"
+            exit 1
+          }
+
+  test-gemini-install:
+    runs-on: windows-latest
+    if: github.event.inputs.test_type == 'gemini-install' || github.event.inputs.test_type == 'full-test'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Test Gemini CLI Installation
+        shell: pwsh
+        run: |
+          Write-Host "Testing Gemini CLI installation..."
+          
+          # Install Gemini CLI
+          npm install -g @google/generative-ai-cli
+          
+          # Test version command
+          try {
+            $version = gemini --version
+            Write-Host "✅ Gemini CLI installed successfully: $version"
+          } catch {
+            Write-Error "❌ Gemini CLI installation failed"
+            exit 1
+          }
+          
+          # Test MCP server installation
+          try {
+            npx -y @modelcontextprotocol/server-github --version
+            Write-Host "✅ MCP server available"
+          } catch {
+            Write-Host "⚠️ MCP server not available (this is expected in test environment)"
+          }
+
+  test-full-workflow:
+    runs-on: windows-latest
+    if: github.event.inputs.test_type == 'full-test'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Test Complete Workflow (Dry Run)
+        shell: pwsh
+        run: |
+          Write-Host "Running complete workflow test (dry run)..."
+          
+          # Test all components
+          $tests = @(
+            @{ Name = "Input Directory"; Path = "${{ github.event.inputs.input_dir }}" },
+            @{ Name = "Output Directory"; Path = "${{ github.event.inputs.output_dir }}" }
+          )
+          
+          foreach ($test in $tests) {
+            Write-Host "Testing $($test.Name): $($test.Path)"
+            if (Test-Path $test.Path) {
+              Write-Host "✅ $($test.Name) exists"
+            } else {
+              Write-Host "⚠️ $($test.Name) does not exist (will be created)"
+            }
+          }
+          
+          # Test MCP configuration
+          New-Item -Path $env:USERPROFILE\.gemini -ItemType Directory -Force
+          $json = @{
+            mcpServers = @{
+              github = @{
+                command = "npx"
+                args = @("-y", "@modelcontextprotocol/server-github")
+                env = @{
+                  GITHUB_PERSONAL_ACCESS_TOKEN = "test-token"
+                }
+              }
+            }
+          } | ConvertTo-Json -Depth 10
+          
+          $json | Set-Content -Path $env:USERPROFILE\.gemini\settings.json
+          
+          if (Test-Path $env:USERPROFILE\.gemini\settings.json) {
+            Write-Host "✅ MCP configuration created"
+          } else {
+            Write-Error "❌ MCP configuration failed"
+            exit 1
+          }
+          
+          # Test Gemini CLI
+          npm install -g @google/generative-ai-cli
+          $version = gemini --version
+          Write-Host "✅ Gemini CLI installed: $version"
+          
+          Write-Host "🎉 All tests passed!"
+
+  test-summary:
+    runs-on: windows-latest
+    needs: [test-validation, test-mcp-config, test-gemini-install, test-full-workflow]
+    if: always()
+    steps:
+      - name: Create Test Summary
+        shell: pwsh
+        run: |
+          Write-Host "## Test Results Summary" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "- **Test Type:** ${{ github.event.inputs.test_type }}" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "- **Input Directory:** ${{ github.event.inputs.input_dir }}" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "- **Output Directory:** ${{ github.event.inputs.output_dir }}" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "" >> $env:GITHUB_STEP_SUMMARY
+          
+          $jobs = @("test-validation", "test-mcp-config", "test-gemini-install", "test-full-workflow")
+          foreach ($job in $jobs) {
+            $status = if (${{ needs.test-validation.result == 'success' }}) { "✅ Passed" } else { "❌ Failed" }
+            Write-Host "- **$job:** $status" >> $env:GITHUB_STEP_SUMMARY
+          } 

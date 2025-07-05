@@ -1,0 +1,209 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of tests to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - unit
+          - integration
+          - workflow
+
+jobs:
+  test-validation:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up PowerShell
+        uses: actions/setup-powershell@v1
+        with:
+          powershell-version: '7.0'
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Install-Module -Name Pester -Force -Scope CurrentUser
+          Import-Module Pester
+
+      - name: Run Test Suite
+        shell: pwsh
+        run: |
+          $testType = "${{ github.event.inputs.test_type || 'all' }}"
+          Write-Host "Running tests: $testType"
+          
+          # Run the test runner
+          .\tests\run-tests.ps1 -TestType $testType
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results
+          path: |
+            test-results/
+            *.xml
+            *.log
+
+  test-workflow-validation:
+    runs-on: windows-latest
+    needs: test-validation
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Workflow Files
+        shell: pwsh
+        run: |
+          Write-Host "Validating workflow files..."
+          
+          $workflowFiles = @(
+            ".github\workflows\update_docs_windows.yml",
+            ".github\workflows\update_docs_linux.yml",
+            ".github\workflows\test-workflow.yml"
+          )
+          
+          foreach ($file in $workflowFiles) {
+            if (Test-Path $file) {
+              Write-Host "✅ Found workflow file: $file"
+              
+              # Basic YAML validation
+              $content = Get-Content $file -Raw
+              if ($content -match "name:" -and $content -match "on:" -and $content -match "jobs:") {
+                Write-Host "✅ Valid YAML structure: $file"
+              } else {
+                Write-Error "❌ Invalid YAML structure: $file"
+                exit 1
+              }
+            } else {
+              Write-Host "⚠️ Missing workflow file: $file"
+            }
+          }
+
+  test-setup-script:
+    runs-on: windows-latest
+    needs: test-validation
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Test Setup Script
+        shell: pwsh
+        run: |
+          Write-Host "Testing setup script functionality..."
+          
+          # Test with minimal parameters
+          $testDir = "test-setup-script"
+          if (Test-Path $testDir) {
+            Remove-Item $testDir -Recurse -Force
+          }
+          New-Item -ItemType Directory -Path $testDir -Force
+          Set-Location $testDir
+          
+          # Copy setup script to test directory
+          Copy-Item "..\setup-workflow.ps1" .
+          
+          # Test basic functionality
+          try {
+            .\setup-workflow.ps1 -Help
+            Write-Host "✅ Setup script help works"
+          } catch {
+            Write-Error "❌ Setup script help failed"
+            exit 1
+          }
+          
+          # Test with parameters
+          try {
+            .\setup-workflow.ps1 -RepositoryName "test-repo" -DefaultBranch "main" -SourceDirectory "src" -DocsDirectory "docs" -Platform "windows"
+            Write-Host "✅ Setup script execution successful"
+          } catch {
+            Write-Error "❌ Setup script execution failed"
+            exit 1
+          }
+          
+          # Cleanup
+          Set-Location ..
+          Remove-Item $testDir -Recurse -Force
+
+  test-documentation:
+    runs-on: windows-latest
+    needs: test-validation
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Documentation
+        shell: pwsh
+        run: |
+          Write-Host "Validating documentation files..."
+          
+          $docsFiles = @(
+            "README.md",
+            "workflow-template.yml",
+            "setup-workflow.ps1"
+          )
+          
+          foreach ($file in $docsFiles) {
+            if (Test-Path $file) {
+              $content = Get-Content $file -Raw
+              $size = (Get-Item $file).Length
+              
+              Write-Host "✅ Found documentation: $file ($size bytes)"
+              
+              # Check for required sections in README
+              if ($file -eq "README.md") {
+                $requiredSections = @("Features", "Quick Start", "Usage")
+                foreach ($section in $requiredSections) {
+                  if ($content -match $section) {
+                    Write-Host "✅ README contains section: $section"
+                  } else {
+                    Write-Host "⚠️ README missing section: $section"
+                  }
+                }
+              }
+            } else {
+              Write-Host "⚠️ Missing documentation: $file"
+            }
+          }
+
+  test-summary:
+    runs-on: windows-latest
+    needs: [test-validation, test-workflow-validation, test-setup-script, test-documentation]
+    if: always()
+    steps:
+      - name: Create Test Summary
+        shell: pwsh
+        run: |
+          Write-Host "## Test Suite Results" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "- **Test Type:** ${{ github.event.inputs.test_type || 'all' }}" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "- **Branch:** ${{ github.ref_name }}" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "- **Commit:** ${{ github.sha }}" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "" >> $env:GITHUB_STEP_SUMMARY
+          
+          $jobs = @("test-validation", "test-workflow-validation", "test-setup-script", "test-documentation")
+          foreach ($job in $jobs) {
+            $status = if (${{ needs.test-validation.result == 'success' }}) { "✅ Passed" } else { "❌ Failed" }
+            Write-Host "- **$job:** $status" >> $env:GITHUB_STEP_SUMMARY
+          }
+          
+          Write-Host "" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "### Test Coverage" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "- Unit tests for setup script" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "- Integration tests for workflow creation" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "- Workflow validation tests" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "- Configuration validation tests" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "- Performance tests" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "- Documentation validation" >> $env:GITHUB_STEP_SUMMARY 

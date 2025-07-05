@@ -1,25 +1,28 @@
+# Template for Gemini CLI + MCP Documentation Workflow
+# Copy this file to your repository and customize as needed
+
 name: Auto Update Docs with Gemini CLI + MCP
 
 on:
   push:
     branches:
-      - main
+      - main  # Change this to your default branch
   workflow_dispatch:
     inputs:
       input_dir:
         description: 'Input directory for documentation generation'
         required: false
-        default: 'src/'
+        default: 'src/'  # Change this to your source directory
         type: string
       output_dir:
         description: 'Output directory for generated documentation'
         required: false
-        default: 'docs/'
+        default: 'docs/'  # Change this to your docs directory
         type: string
       branch_name:
         description: 'Branch to commit changes to'
         required: false
-        default: 'main'
+        default: 'main'  # Change this to your default branch
         type: string
       commit_message:
         description: 'Commit message for documentation updates'
@@ -39,7 +42,7 @@ on:
       
 jobs:
   update-docs:
-    runs-on: windows-latest
+    runs-on: windows-latest  # Change to ubuntu-latest for Linux
     env:
       INPUT_DIR: ${{ github.event.inputs.input_dir || 'src/' }}
       OUTPUT_DIR: ${{ github.event.inputs.output_dir || 'docs/' }}
@@ -174,3 +177,28 @@ jobs:
             $fileCount = (Get-ChildItem "${{ env.OUTPUT_DIR }}" -Recurse -File | Measure-Object).Count
             Write-Host "- **Files Generated:** $fileCount" >> $env:GITHUB_STEP_SUMMARY
           }
+
+# =============================================================================
+# CUSTOMIZATION GUIDE
+# =============================================================================
+#
+# 1. REPOSITORY-SPECIFIC CHANGES:
+#    - Change 'main' to your default branch name
+#    - Update 'src/' to your source code directory
+#    - Update 'docs/' to your documentation directory
+#
+# 2. REQUIRED SECRETS:
+#    - PERSONAL_ACCESS_TOKEN: GitHub token with repo permissions
+#    - GITHUB_TOKEN: Automatically provided
+#
+# 3. OPTIONAL CUSTOMIZATIONS:
+#    - Change 'windows-latest' to 'ubuntu-latest' for Linux
+#    - Modify commit message format
+#    - Add conditional triggers (e.g., only on specific paths)
+#
+# 4. ADVANCED FEATURES:
+#    - Add multiple documentation sets
+#    - Configure custom MCP servers
+#    - Set up different workflows for different branches
+#
+# ============================================================================= 
