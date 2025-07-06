@@ -3,174 +3,73 @@ name: Auto Update Docs with Gemini CLI + MCP
 on:
   push:
     branches:
-      - main
+      - 1-testcli-mcp-src
   workflow_dispatch:
-    inputs:
-      input_dir:
-        description: 'Input directory for documentation generation'
-        required: false
-        default: 'src/'
-        type: string
-      output_dir:
-        description: 'Output directory for generated documentation'
-        required: false
-        default: 'docs/'
-        type: string
-      branch_name:
-        description: 'Branch to commit changes to'
-        required: false
-        default: 'main'
-        type: string
-      commit_message:
-        description: 'Commit message for documentation updates'
-        required: false
-        default: 'Auto-update docs with Gemini CLI + MCP'
-        type: string
-      enable_auto_push:
-        description: 'Enable automatic push to repository'
-        required: false
-        default: true
-        type: boolean
-      clean_cache:
-        description: 'Clean npm cache before running'
-        required: false
-        default: true
-        type: boolean
       
 jobs:
   update-docs:
     runs-on: windows-latest
-    env:
-      INPUT_DIR: ${{ github.event.inputs.input_dir || 'src/' }}
-      OUTPUT_DIR: ${{ github.event.inputs.output_dir || 'docs/' }}
-      BRANCH_NAME: ${{ github.event.inputs.branch_name || github.ref_name }}
-      COMMIT_MESSAGE: ${{ github.event.inputs.commit_message || 'Auto-update docs with Gemini CLI + MCP' }}
-      ENABLE_AUTO_PUSH: ${{ github.event.inputs.enable_auto_push || 'true' }}
-      CLEAN_CACHE: ${{ github.event.inputs.clean_cache || 'true' }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.PERSONAL_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
-          ref: ${{ env.BRANCH_NAME }}
+      - uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Configure MCP Server
         shell: pwsh
         run: |
-          # Create .gemini directory
           New-Item -Path $env:USERPROFILE\.gemini -ItemType Directory -Force
-          
-          # Create MCP configuration
-          $json = @{
-            mcpServers = @{
-              github = @{
-                command = "npx"
-                args = @("-y", "@modelcontextprotocol/server-github")
-                env = @{
-                  GITHUB_PERSONAL_ACCESS_TOKEN = "${{ env.PERSONAL_ACCESS_TOKEN }}"
+          $json = @'
+          {
+            "mcpServers": {
+              "github": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-github"],
+                "env": {
+                  "GITHUB_PERSONAL_ACCESS_TOKEN": "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
                 }
               }
             }
-          } | ConvertTo-Json -Depth 10
-          
-          $json | Set-Content -Path $env:USERPROFILE\.gemini\settings.json
-          
-          # Verify configuration was created
-          if (Test-Path $env:USERPROFILE\.gemini\settings.json) {
-            Write-Host "MCP configuration created successfully"
-          } else {
-            Write-Error "Failed to create MCP configuration"
-            exit 1
           }
+          '@
+          $json | Set-Content -Path $env:USERPROFILE\.gemini\settings.json
     
       - name: Clean npm cache
-        if: env.CLEAN_CACHE == 'true'
         run: npm cache clean --force
         shell: pwsh
 
       - name: Install Gemini CLI
+        run: npm install -g @google/gemini-cli
         shell: pwsh
-        run: |
-          # Install Gemini CLI globally
-          npm install -g @google/generative-ai-cli
-          
-          # Verify installation
-          gemini --version
-          
-          # Install MCP server if not already available
-          npx -y @modelcontextprotocol/server-github --version
-
-      - name: Validate input directory
-        shell: pwsh
-        run: |
-          if (Test-Path "${{ env.INPUT_DIR }}") {
-            Write-Host "Input directory '${{ env.INPUT_DIR }}' exists"
-            Get-ChildItem "${{ env.INPUT_DIR }}" | Measure-Object | ForEach-Object { Write-Host "Found $($_.Count) items in input directory" }
-          } else {
-            Write-Error "Input directory '${{ env.INPUT_DIR }}' does not exist"
-            exit 1
-          }
 
       - name: Generate Documentation
         shell: pwsh
         run: |
-          # Create output directory if it doesn't exist
-          New-Item -Path "${{ env.OUTPUT_DIR }}" -ItemType Directory -Force
+          # Create necessary directories
+          New-Item -Path "scripts" -ItemType Directory -Force
           
-          # Generate documentation
-          gemini docs --input="${{ env.INPUT_DIR }}" --output="${{ env.OUTPUT_DIR }}" --use-mcp=github
-          
-          # Verify documentation was generated
-          if (Test-Path "${{ env.OUTPUT_DIR }}") {
-            Get-ChildItem "${{ env.OUTPUT_DIR }}" -Recurse | Measure-Object | ForEach-Object { 
-              Write-Host "Generated $($_.Count) documentation files" 
-            }
+          # Run the documentation generation script
+          if (Test-Path "scripts/generate-docs.js") {
+            node scripts/generate-docs.js
           } else {
-            Write-Error "Documentation generation failed - output directory not found"
-            exit 1
+            Write-Host "📝 Note: Gemini CLI is primarily interactive."
+            Write-Host "🔧 For automated documentation generation, consider:"
+            Write-Host "   - Using the Gemini API directly"
+            Write-Host "   - Creating a custom MCP server"
+            Write-Host "   - Using tools like JSDoc, TypeDoc, or similar"
+            
+            # Create placeholder documentation
+            New-Item -Path "docs" -ItemType Directory -Force
+            "# Auto-generated Documentation`n`nGenerated on: $(Get-Date)`n`nThis is a placeholder. Set up proper documentation generation." | Out-File -FilePath "docs/README.md" -Encoding UTF8
           }
 
       - name: Commit and Push Documentation
-        if: env.ENABLE_AUTO_PUSH == 'true'
         shell: pwsh
         run: |
-          # Configure git
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
-          
-          # Check if there are changes to commit
-          git add "${{ env.OUTPUT_DIR }}"
-          $status = git status --porcelain
-          
-          if ($status) {
-            Write-Host "Changes detected, committing..."
-            git commit -m "${{ env.COMMIT_MESSAGE }}"
-            git push origin "${{ env.BRANCH_NAME }}"
-            Write-Host "Successfully pushed documentation updates"
-          } else {
-            Write-Host "No changes to commit"
-          }
-
-      - name: Create Summary
-        shell: pwsh
-        run: |
-          Write-Host "## Documentation Generation Summary" >> $env:GITHUB_STEP_SUMMARY
-          Write-Host "" >> $env:GITHUB_STEP_SUMMARY
-          Write-Host "- **Input Directory:** ${{ env.INPUT_DIR }}" >> $env:GITHUB_STEP_SUMMARY
-          Write-Host "- **Output Directory:** ${{ env.OUTPUT_DIR }}" >> $env:GITHUB_STEP_SUMMARY
-          Write-Host "- **Branch:** ${{ env.BRANCH_NAME }}" >> $env:GITHUB_STEP_SUMMARY
-          Write-Host "- **Auto Push:** ${{ env.ENABLE_AUTO_PUSH }}" >> $env:GITHUB_STEP_SUMMARY
-          
-          if (Test-Path "${{ env.OUTPUT_DIR }}") {
-            $fileCount = (Get-ChildItem "${{ env.OUTPUT_DIR }}" -Recurse -File | Measure-Object).Count
-            Write-Host "- **Files Generated:** $fileCount" >> $env:GITHUB_STEP_SUMMARY
-          }
+          git add docs/
+          git commit -m "Auto-update docs with Gemini CLI + MCP" || echo "No changes to commit"
+          git push
