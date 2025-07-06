@@ -8,7 +8,8 @@ This repository contains a versatile GitHub Actions workflow that automatically 
 - **Configurable paths**: Customize input and output directories
 - **Flexible triggers**: Manual dispatch or automatic on push
 - **Error handling**: Comprehensive validation and error reporting
-- **Customizable**: Easy to adapt for different repositories
+- **MCP Integration**: GitHub MCP server for enhanced context
+- **Automated workflow**: Seamless documentation updates
 
 ## Quick Start
 
@@ -32,6 +33,22 @@ The workflow is designed to work out of the box with these defaults:
 - **Input directory**: `src/`
 - **Output directory**: `docs/`
 - **Branch**: `main`
+
+## How It Works
+
+### MCP Server Configuration
+
+The workflow automatically configures a GitHub MCP server that provides:
+- Repository context and file information
+- Issue and pull request data
+- Enhanced documentation generation capabilities
+
+### Documentation Generation Process
+
+1. **Setup**: Installs Node.js and Gemini CLI
+2. **MCP Configuration**: Creates `.gemini/settings.json` with GitHub MCP server
+3. **Documentation**: Generates docs from your source files
+4. **Commit & Push**: Automatically commits and pushes changes
 
 ## Customization Options
 
@@ -113,6 +130,23 @@ DEFAULT_BRANCH: "develop"
 - Secure MCP server configuration
 - No hardcoded credentials
 
+## Advanced Features
+
+### MCP Server Integration
+
+The workflow includes a GitHub MCP server that provides:
+- Repository metadata access
+- File content and structure information
+- Issue and PR management capabilities
+- Enhanced context for documentation generation
+
+### Custom Documentation Scripts
+
+The repository includes a sample `scripts/generate_docs.js` that demonstrates:
+- File system operations
+- Documentation template generation
+- Integration with external tools
+
 ## Troubleshooting
 
 ### Common Issues
@@ -183,13 +217,31 @@ mcpServers:
     args: ["-y", "your-custom-mcp-server"]
 ```
 
-## Contributing
+## Development
+
+### Local Testing
+
+To test the workflow locally:
+
+1. Clone the repository
+2. Set up your GitHub token
+3. Run the workflow manually
+4. Check the generated documentation
+
+### Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
 4. Test with different repository structures
 5. Submit a pull request
+
+## Related Files
+
+- `.github/workflows/update_docs_windows.yml`: Windows workflow
+- `.github/workflows/update_docs_linux.yml`: Linux workflow
+- `scripts/generate_docs.js`: Sample documentation script
+- `Gemini.md`: Project configuration and conventions
 
 ## License
 
