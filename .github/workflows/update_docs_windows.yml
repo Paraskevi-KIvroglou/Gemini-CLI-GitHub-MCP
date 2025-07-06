@@ -3,7 +3,7 @@ name: Auto Update Docs with Gemini CLI + MCP
 on:
   push:
     branches:
-      - 1-testcli-mcp-src
+      - 2-versatile-use
   workflow_dispatch:
       
 jobs:
