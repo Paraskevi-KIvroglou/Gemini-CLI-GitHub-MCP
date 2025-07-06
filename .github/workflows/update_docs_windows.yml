@@ -2,8 +2,8 @@ name: Auto Update Docs with Gemini CLI + MCP
 
 on:
   push:
-    branches:
-      - 2-versatile-use
+    branches: #Change this to your default branch - or add a branch name
+      - main 
   workflow_dispatch:
       
 jobs:
